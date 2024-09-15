@@ -4,6 +4,6 @@ import java.nio.channels.WritableByteChannel;
 
 public abstract class IoWriter {
  public int bufSize;
- public OutputStream out;
+ public WritableByteChannel out;
  public abstract void flush()throws Exception;
 }

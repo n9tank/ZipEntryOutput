@@ -3,18 +3,15 @@ import java.nio.ByteBuffer;
 import me.steinborn.libdeflate.LibdeflateCompressor;
 
 public class libDeflate extends LibdeflateCompressor {
- public int mode;
  public int rby;
  public int wby;
  public libDeflate(int lvl) {
-  super(lvl);
+  super(lvl, 0);
  }
  public int compress(ByteBuffer src, ByteBuffer drc) {
   rby += src.limit();
-  int i=compress(src, drc, mode);
+  int i=super.compress(src, drc);
   wby += i;
-  src.clear();
-  drc.flip();
   return i;
  }
 }

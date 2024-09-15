@@ -29,8 +29,7 @@ public class ZipUtil {
    ZipEntryOutput.DeflaterIo def=out.outDef;
    for (int i=0;i < len;++i) {
     ZipEntryM ze=newEntry(null, 1);
-    ze.onlyInput = true;
-    out.putEntry(ze);
+    out.putEntry(ze, false, true);
     int add=rnd[i] + ran.nextInt(rnd[++i]);
     while (add > 0) {
      int wlen=Math.min(add, blen);
@@ -43,23 +42,6 @@ public class ZipUtil {
      c += add;
     }
    }
-  }
- }
- /*
-  尽管有多线程的支持，但压缩等级不大的话，这不会提供较大性能提升，建议用上面的方法。
-  */
- public static void addRandomHead(ParallelDeflate out, int rnd[]) throws Exception {
-  int len=rnd.length;
-  if (len == 1 || !out.async) {
-   addRandomHead(out.zipout, rnd);
-  } else {
-   out.setHeadOffMode();
-   for (int i=0;i < len;++i) {
-    ZipEntryM ze=newEntry(null, 1);
-    ze.onlyInput = true;
-    out.with(new RandomIo(rnd[i], rnd[++i]), ze);
-   }
-   out.check(true);
   }
  }
 }

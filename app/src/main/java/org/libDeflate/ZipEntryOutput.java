@@ -230,7 +230,7 @@ public class ZipEntryOutput extends OutputStream implements WritableByteChannel 
   if (!skip)len = zip.encode(charsetEncoder, this, utf8);
   else len = 0;
   if (len > 0) fixNameSize(off + 28, len);
-  else buff.putShort(pos + 26, (short)(buff.position() - 30 - pos));
+  else buff.putShort(pos + 26, (short)(len = buff.position() - 30 - pos));
   upLength(len + 30);
  }
  public short globalBit(boolean data, boolean utf8) {
@@ -328,8 +328,8 @@ public class ZipEntryOutput extends OutputStream implements WritableByteChannel 
   buff.putInt((int)(zip.start - headOff));
   int len=zip.encode(charsetEncoder, this, utf8);
   if (len > 0)fixNameSize(off + 28, len);
-  else buff.putShort(pos + 28, (short)(buff.position() - 46 - pos));
-  upLength(len + 26);
+  else buff.putShort(pos + 28, (short)(len = buff.position() - 46 - pos));
+  upLength(len + 46);
  }
  public static void fill(ByteBuffer buf, int pos) {
   int i=buf.position();

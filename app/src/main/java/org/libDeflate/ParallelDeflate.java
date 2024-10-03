@@ -6,19 +6,16 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.WritableByteChannel;
-import java.util.List;
-import java.util.Vector;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.LongAdder;
 import me.steinborn.libdeflate.LibdeflateCRC32;
 import me.steinborn.libdeflate.LibdeflateJavaUtils;
-import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
-public class ParallelDeflate implements AutoCloseable {
+public class ParallelDeflate implements AutoCloseable,Canceler {
  public class DeflateWriter implements Callable,AutoCloseable {
   public InputGet in;
   public boolean raw;
@@ -91,13 +88,13 @@ public class ParallelDeflate implements AutoCloseable {
      if (upwrok) {
       if (!wroking)join();
       wroking = upwrok;
-     } else list.push(this);
+     } else list.offer(this);
     }
    } catch (Exception e) {
     on.onError(e);
    }
    if (wroking)clearList(false);
-   check();
+   on.pop();
    return null;
   }
   public void close() throws Exception {
@@ -118,10 +115,10 @@ public class ParallelDeflate implements AutoCloseable {
   clearList(list, close);
   wrok.set(false);
  }
- public void clearList(ConcurrentLinkedDeque<DeflateWriter> obj, boolean close) {
+ public void clearList(ConcurrentLinkedQueue<DeflateWriter> obj, boolean close) {
   if (obj == null)return;
-  while (!obj.isEmpty()) {
-   DeflateWriter def=obj.pop();
+  DeflateWriter def;
+  while ((def = obj.poll()) != null) {
    try {
     if (close)def.close();
     else def.join();
@@ -130,60 +127,36 @@ public class ParallelDeflate implements AutoCloseable {
    }
   }
  }
- public void check() {
-  boolean async=this.async;
-  if (async) {
-   LongAdder la=io;
-   la.decrement();
-   if (la.sum() >= 0)return;
-   if (flist == null) {
-    on.onClose();
-    return;
-   }
-   clearList(false);
-  }
-  if (!async || io.sum() < 0) {
-   try {
-    zipout.close();
-   } catch (Exception e) {
-    on.onError(e);
-   }
-   on.onClose();
+ public void end() {
+  clearList(false);
+  try {
+   zipout.close();
+  } catch (Exception e) {
+   on.onError(e);
   }
  }
- public void close() throws Exception {
-  if (!async|| flist != null)check();
+ public void close() throws IOException {
+  if (async)on.pop();
+  else zipout.close();
  }
- public boolean cancel() {
-  Vector<Future> list=flist;
-  if (list == null)return false;
-  this.flist = null;
-  for (Future fu:list)
-   fu.cancel(true);
+ public void cancel() {
+  if (!on.cancel())return;
   zipout.cancel();
   clearList(true);
-  return true;
+  return;
  }
- public void addTask(DeflateWriter run) {
-  io.increment();
-  flist.add(pool.submit(run));
- }
- public static ExecutorService pool=Executors.newWorkStealingPool();
- public volatile Vector<Future> flist;
- public ConcurrentLinkedDeque list;
+ public final static ExecutorService pool=new ForkJoinPool();
+ public ConcurrentLinkedQueue list;
  public AtomicBoolean wrok;
- public LongAdder io;
  public ZipEntryOutput zipout;
  public boolean async;
  public ErrorHandler on;
  public ParallelDeflate(ZipEntryOutput out, boolean async) {
   zipout = out;
   if (async) {
-   list = new ConcurrentLinkedDeque();
-   flist = new Vector();
+   list = new ConcurrentLinkedQueue();
    wrok = new AtomicBoolean();
    this.async = async;
-   io = new LongAdder();
   }
  }
  public FileOrBufOutput write(IoWriter io, boolean iswrok, ZipEntryM zip) throws Exception {
@@ -213,7 +186,7 @@ public class ParallelDeflate implements AutoCloseable {
   if (!async) {
    zipout.putEntry(zip);
    io.flush();
-  } else addTask(new DeflateWriter(io, zip));
+  } else on.add(new DeflateWriter(io, zip));
  }
  public BufIo toZip(BufIo out, ZipEntryM zip) throws IOException {
   ZipEntryOutput zipput=zipout;
@@ -235,7 +208,7 @@ public class ParallelDeflate implements AutoCloseable {
    data.putEntry(zip);
    addFile(file, data, zip);
   } else {
-   addTask(new DeflateWriter(file, zip));
+   on.add(new DeflateWriter(file, zip));
   }
  }
  public static BufIo unIo(WritableByteChannel wt) {
@@ -328,7 +301,7 @@ public class ParallelDeflate implements AutoCloseable {
   copyIo(in, zip);
  }
  public void copyToZip(InputGet ing, ZipEntryM zip) throws IOException {
-  addTask(new DeflateWriter(ing, zip, true));
+  on.add(new DeflateWriter(ing, zip, true));
  }
  public void writeToZip(InputStream in, ZipEntryM zip) throws IOException {
   ZipEntryOutput out=zipout;
@@ -344,6 +317,6 @@ public class ParallelDeflate implements AutoCloseable {
   }
  }
  public void writeToZip(InputGet ing, ZipEntryM zip) throws IOException {
-  addTask(new DeflateWriter(ing, zip, zip.mode <= 0));
+  on.add(new DeflateWriter(ing, zip, zip.mode <= 0));
  }
 }

@@ -9,7 +9,7 @@ public class libDeflate extends LibdeflateCompressor {
   super(lvl, 0);
  }
  public int compress(ByteBuffer src, ByteBuffer drc) {
-  rby += src.limit();
+  rby += src.remaining();
   int i=super.compress(src, drc);
   wby += i;
   return i;

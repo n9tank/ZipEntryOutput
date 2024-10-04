@@ -4,6 +4,7 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.WritableByteChannel;
+import android.util.Log;
 
 public class ByteBufIo extends OutputStream implements WritableByteChannel,BufIo {
  public void write(int b) {
@@ -34,19 +35,14 @@ public class ByteBufIo extends OutputStream implements WritableByteChannel,BufIo
   buf.clear();
  }
  public void flushIo() throws IOException {
-  check((buf.capacity() & 4095) + 1);
+  getBuf((buf.capacity() & 4095) + 1);
  }
  public ByteBuffer getBuf(int page) throws IOException {
-  check(page);
-  return buf;
- }
- public int check(int page) throws IOException {
   ByteBuffer buf=this.buf;
   int pos=buf.position();
   int cy=buf.capacity() - page;
-  int len=0;
   if (pos > cy) {
-   len = pos & -4096;
+   int len = pos & -4096;
    WritableByteChannel wt=this.wt;
    buf.rewind();
    buf.limit(len);
@@ -56,7 +52,7 @@ public class ByteBufIo extends OutputStream implements WritableByteChannel,BufIo
    buf.position(len); 
    buf.compact();
   }
-  return len;
+  return buf;
  }
  public void put(byte brr[], int off, int len) throws IOException {
   WritableByteChannel wt=this.wt;
@@ -97,7 +93,7 @@ public class ByteBufIo extends OutputStream implements WritableByteChannel,BufIo
    int limt=Math.max(0, cy - buf.position());
    int wlen=len - limt;
    if (wlen > 0)put.limit(limt);
-   if (limt < cy || wlen < 0 )buf.put(put);
+   if (limt < cy || wlen < 0)buf.put(put);
    limt = put.position();
    wlen = len - limt;
    if (wlen > 0) {

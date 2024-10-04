@@ -59,7 +59,7 @@ public class ZipEntryOutput extends OutputStream implements WritableByteChannel 
  public static final int onlyInput=2;
  public static final int rcise=4;
  public static final int enmode=8;
- public static final int openJDk8opt=16;
+ public static final int openJdk8opt=16;
  public static final int igonUtf8=32;
  public boolean pk78;
  public long last;
@@ -222,14 +222,14 @@ public class ZipEntryOutput extends OutputStream implements WritableByteChannel 
   ByteBuffer buff=out.getBuf(1024);
   int pos=buff.position();
   buff.putInt(0x04034b50);
-  putBits(buff, utf8, zip);
+  putBits(buff, utf8, false, zip);
   fill(buff, pos + 26);
   buff.position(pos + 28);
   fill(buff, pos + 30);
   int len;
   if (!skip)len = zip.encode(charsetEncoder, this, utf8);
   else len = 0;
-  if (len > 0) fixNameSize(off + 28, len);
+  if (len > 0) fixNameSize(off + 26, len);
   else buff.putShort(pos + 26, (short)(len = buff.position() - 30 - pos));
   upLength(len + 30);
  }
@@ -298,20 +298,20 @@ public class ZipEntryOutput extends OutputStream implements WritableByteChannel 
    }
   }
  }
- public void putBits(ByteBuffer buff, boolean utf8, ZipEntryM zip) {
+ public void putBits(ByteBuffer buff, boolean utf8, boolean need, ZipEntryM zip) {
   short mode=zip.mode;
   int flag=this.flag;
   buff.putShort((short)0);//ver 该值没有任何作用
   boolean data;
   buff.putShort(globalBit(data = (!zip.notFix && (flag & AsInput) > 0 && rnio == null), utf8));
   pk78 |= data;
-  boolean enmode=(flag & this.enmode) == 0;
-  buff.putShort((short)(enmode && mode <= 0 ?0: 8));
+  boolean enmode=(flag & this.enmode) > 0;
+  buff.putShort((short)(!enmode && mode <= 0 ?0: 8));
   buff.putInt(zip.xdostime);
   buff.putInt(zip.crc);
   buff.putInt(enmode && mode <= 0 ?0 : ((flag & rcise) > 0 ?-1: zip.csize));
   int size=zip.size;
-  buff.putInt(Math.max(0, ((flag & openJDk8opt) > 0 && mode > 0 && size > 65534 ?65534: size)));
+  buff.putInt(!need && enmode ?0: Math.max(0, mode > 0 && (openJdk8opt & flag) > 0 && size > 65534 ?65534: size));
  }
  public void writeEntryEnd(ZipEntryM zip) throws IOException {
   CharsetEncoder charsetEncoder=this.charsetEncoder;
@@ -321,7 +321,7 @@ public class ZipEntryOutput extends OutputStream implements WritableByteChannel 
   int pos=buff.position();
   buff.putInt(0x02014b50);
   buff.putShort((short)0);
-  putBits(buff, utf8, zip);
+  putBits(buff, utf8, true, zip);
   fill(buff, pos + 28);
   buff.position(pos + 30);
   fill(buff, pos + 42);

@@ -32,16 +32,10 @@ public class FileOrBufOutput implements BufIo {
  }
  public ByteBuffer getBuf(int page) throws IOException {
   ByteBuffer buf=this.buf;
-  check(page);
-  return buf;
- }
- public int check(int page) throws IOException {
-  ByteBuffer buf=this.buf;
   int pos=buf.position();
   int cy=buf.capacity() - page;
-  int len=0;
   if (cy >= page && pos > cy) {
-   len = pos & -4096;
+   int len = pos & -4096;
    buf.rewind();
    buf.limit(len);
    WritableByteChannel wt=openFile();
@@ -51,7 +45,7 @@ public class FileOrBufOutput implements BufIo {
    buf.position(len); 
    buf.compact();
   }
-  return len;
+  return buf;
  }
  public int write(ByteBuffer src) throws IOException {
   throw new RuntimeException();

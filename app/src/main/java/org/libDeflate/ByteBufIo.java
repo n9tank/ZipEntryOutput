@@ -6,7 +6,7 @@ import java.nio.ByteOrder;
 import java.nio.channels.WritableByteChannel;
 import android.util.Log;
 
-public class ByteBufIo extends OutputStream implements WritableByteChannel,BufIo {
+public class ByteBufIo extends OutputStream implements WritableByteChannel {
  public void write(int b) {
   throw new RuntimeException();
  }
@@ -33,9 +33,6 @@ public class ByteBufIo extends OutputStream implements WritableByteChannel,BufIo
   if (buf == null)return;
   NioWriter.write(buf, wt);
   buf.clear();
- }
- public void flushIo() throws IOException {
-  getBuf((buf.capacity() & 4095) + 1);
  }
  public ByteBuffer getBuf(int page) throws IOException {
   ByteBuffer buf=this.buf;
@@ -64,14 +61,14 @@ public class ByteBufIo extends OutputStream implements WritableByteChannel,BufIo
  }
  public void write(byte brr[], int off, int len) throws IOException {
   ByteBuffer buf=this.buf;
-  int cy=buf.capacity() & -4096;
-  int limt=Math.max(0, cy - buf.position());
+  int cy=buf.capacity();
+  int limt=buf.remaining();
   int wlen=len - limt;
   if (limt < cy || wlen < 0 || buf.isDirect())
    buf.put(brr, off, Math.min(len, limt));
   else wlen = len;
   if (wlen > 0) {
-   flushIo();
+   flush();
    off += limt;
    if (wlen >= cy) {
     int rlen=wlen & 4095;
@@ -83,21 +80,22 @@ public class ByteBufIo extends OutputStream implements WritableByteChannel,BufIo
   }
  }
  public int write(ByteBuffer put) throws IOException {
-  int len=put.limit();
+  int len=put.remaining();
   int rsize=len;
   if (!put.isDirect()) {
-   write(put.array(), 0, len);
+   write(put.array(), put.position(), len);
   } else {
    ByteBuffer buf=this.buf;
-   int cy=buf.capacity() & -4096;
-   int limt=Math.max(0, cy - buf.position());
+   int cy=buf.capacity();
+   int limt=buf.remaining();
    int wlen=len - limt;
-   if (wlen > 0)put.limit(limt);
+   int rlen=put.limit();
+   if (wlen > 0)put.limit(put.position() + limt);
    if (limt < cy || wlen < 0)buf.put(put);
    limt = put.position();
    wlen = len - limt;
    if (wlen > 0) {
-    flushIo();
+    flush();
     if (wlen >= cy) {
      WritableByteChannel wt=this.wt;
      if (wt != null) {
@@ -106,7 +104,7 @@ public class ByteBufIo extends OutputStream implements WritableByteChannel,BufIo
        wt.write(put);
      }
     }
-    put.limit(len);
+    put.limit(rlen);
     buf.put(put);
    }
   }

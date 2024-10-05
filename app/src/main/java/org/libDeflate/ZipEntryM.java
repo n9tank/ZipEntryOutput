@@ -50,13 +50,13 @@ public class ZipEntryM {
   CharsetEncoder cr=(utf ?zip.utf8: en);
   while (cr.encode(buf, out, true).isOverflow()) {
    len += out.position() - pos;
-   io.flushIo();
+   io.flush();
    pos = out.position();
    out.limit(cy);
   }
   while (cr.flush(out).isOverflow()) {
    len += out.position() - pos;
-   io.flushIo();
+   io.flush();
    pos = out.position();
    out.limit(cy);
   }

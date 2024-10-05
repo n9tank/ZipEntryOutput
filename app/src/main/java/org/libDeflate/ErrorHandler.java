@@ -4,6 +4,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.LongAdder;
+import java.io.IOException;
 
 public abstract class ErrorHandler {
  public volatile Vector<Future> flist=new Vector();
@@ -16,7 +17,8 @@ public abstract class ErrorHandler {
   this.pool = pool;
   this.can = can;
  }
- public void add(Callable call) {
+ public void add(Callable call) throws IOException {
+  if (!igron && err.size() > 0)throw new IOException();
   io.increment();
   addN(call);
  }

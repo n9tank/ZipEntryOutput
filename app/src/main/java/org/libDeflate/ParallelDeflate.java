@@ -145,7 +145,7 @@ public class ParallelDeflate implements AutoCloseable,Canceler {
    buf = put == null || put.capacity() < size ?ByteBuffer.allocateDirect(size): put;
   } else {
    if (add)out.putEntry(ze, true);
-   buf = out.outBuf.getBuf(out.outPage);
+   buf = out.getBuf(out.outPage);
   }
   int outlen=def.compress(src, buf);
   if (size < 0 || !add)
@@ -173,7 +173,7 @@ public class ParallelDeflate implements AutoCloseable,Canceler {
  public ByteBuffer write(IoWriter io, boolean iswrok, ZipEntryM zip) throws Exception {
   BufOutput buf;
   if (io.out == null)
-   io.out = buf = new BufOutput(LibdeflateJavaUtils.getBufSize(io.bufSize, 0));
+   io.out = buf = new BufOutput(io.bufSize);
   else {
    buf = null;
    zipout.putEntry(zip, true);

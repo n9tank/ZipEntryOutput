@@ -1,15 +1,10 @@
 package org.libDeflate;
-import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.nio.channels.WritableByteChannel;
-import java.nio.file.Files;
-import android.util.Log;
 
 
-public class BufOutput implements WritableByteChannel {
+public class BufOutput implements BufIo {
  public boolean isOpen() {
   return true;
  }
@@ -26,7 +21,10 @@ public class BufOutput implements WritableByteChannel {
   n |= n >>> 16;  
   return n + 1;  
  }
- public ByteBuffer capacity2() {
+ public ByteBuffer getBuf(){
+  return buf;
+ }
+ public ByteBuffer getBufFlush() {
   ByteBuffer old=this.buf;
   ByteBuffer buf=ByteBuffer.allocateDirect(old.capacity() << 1);
   this.buf = buf;
@@ -46,11 +44,6 @@ public class BufOutput implements WritableByteChannel {
   }
   buf.put(src);
   return len;
- }
- public void writeTo(ZipEntryOutput zip) throws IOException {
-  ByteBuffer buf=this.buf;
-  buf.flip();
-  zip.write(buf);
  }
  public void close() {
  }

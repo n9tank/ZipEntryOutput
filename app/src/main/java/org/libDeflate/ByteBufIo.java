@@ -5,7 +5,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.WritableByteChannel;
 
-public class ByteBufIo extends OutputStream implements WritableByteChannel {
+public class ByteBufIo extends OutputStream implements BufIo {
  public void write(int b) {
   throw new RuntimeException();
  }
@@ -26,6 +26,13 @@ public class ByteBufIo extends OutputStream implements WritableByteChannel {
   } finally {
    wt.close();
   }
+ }
+ public ByteBuffer getBuf() {
+  return buf;
+ }
+ public ByteBuffer getBufFlush() throws IOException {
+  flush();
+  return buf;
  }
  public void flush() throws IOException {
   ByteBuffer buf=this.buf;

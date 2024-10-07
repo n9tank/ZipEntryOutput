@@ -1,42 +1,44 @@
 package org.libDeflate;
-import java.io.IOException;
 import java.io.Writer;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
-import java.nio.channels.WritableByteChannel;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetEncoder;
+import java.io.IOException;
 
 public class BufWriter extends Writer {
- public void flush() {
- }
- public void write(char[] cbuf, int off, int len) {
+ public void write(char[] cbuf, int off, int len) throws IOException {
   write(CharBuffer.wrap(cbuf, off, len));
  }
- public void write(String str) {
+ public void write(String str) throws IOException {
   write(CharBuffer.wrap(str));
  }
- public void write(CharBuffer str) {
-  BufOutput put=this.buf;
-  ByteBuffer buf=put.buf;
+ public void write(CharBuffer str) throws IOException {
+  BufIo put=this.buf;
+  ByteBuffer buf=put.getBuf();
   CharsetEncoder en=this.en;
   while (str.hasRemaining()) {
    if (en.encode(str, buf, false).isOverflow())
-    buf = put.capacity2();
+    buf = put.getBufFlush();
   }
  }
- public void close(){
-  BufOutput put=this.buf;
-  ByteBuffer buf=put.buf;
+ public void flush() throws IOException {
+  BufIo put=this.buf;
+  ByteBuffer buf=put.getBuf();
   CharBuffer str=CharBuffer.allocate(0);
   while (en.encode(str, buf, true).isOverflow())
-   buf = put.capacity2();
+   buf = put.getBufFlush();
   while (en.flush(buf).isOverflow())
-   buf = put.capacity2();
+   buf = put.getBufFlush();
+  en.reset();
  }
- public BufOutput buf;
+ public void close() throws IOException {
+  buf.close();
+ }
+ public boolean flush;
+ public BufIo buf;
  public CharsetEncoder en;
- public BufWriter(BufOutput out, Charset set) {
+ public BufWriter(BufIo out, Charset set) {
   buf = out;
   en = set.newEncoder();
  }

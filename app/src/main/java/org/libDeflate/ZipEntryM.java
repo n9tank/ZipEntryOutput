@@ -42,7 +42,7 @@ public class ZipEntryM {
  public int encode(CharsetEncoder en, ZipEntryOutput zip, boolean utf) throws IOException {
   String str=name;
   int len=0;
-  ByteBufIo io=zip.rnio == null ?null: zip.outBuf;
+  ByteBufIo io=zip.rnio == null ?null: zip;
   ByteBuffer out=io.buf;
   int pos=out.position();
   int cy=out.capacity() & -4096;

@@ -14,12 +14,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import me.steinborn.libdeflate.LibdeflateCRC32;
 import me.steinborn.libdeflate.LibdeflateCompressor;
-import android.util.Log;
 import me.steinborn.libdeflate.LibdeflateJavaUtils;
+import java.io.BufferedWriter;
 
 
-public class ZipEntryOutput extends OutputStream implements WritableByteChannel {
- public class DeflaterIo extends OutputStream implements WritableByteChannel {
+public class ZipEntryOutput extends ByteBufIo {
+ public class DeflaterIo extends OutputStream implements BufIo {
   public LibdeflateCRC32 crc=new LibdeflateCRC32();
   public LibdeflateCompressor def;
   public int lvl;
@@ -31,6 +31,30 @@ public class ZipEntryOutput extends OutputStream implements WritableByteChannel 
   }
   public boolean isOpen() {
    return true;
+  }
+  public BufIo getBufIo() {
+   ZipEntryOutput zip=ZipEntryOutput.this;
+   BufIo buf=((BufIo)(zip.entry.mode > 0 ?copy: zip));
+   return buf;
+  }
+  public ByteBuffer getBuf() {
+   return getBufIo().getBuf();
+  }
+  public ByteBuffer getBufFlush() throws IOException {
+   BufIo bufio = getBufIo();
+   if (bufio instanceof ZipEntryOutput) {
+    ZipEntryOutput zip=ZipEntryOutput.this;
+    if (!zip.entry.notFix) {
+     ByteBuffer buf=zip.buf;
+     int pos=buf.position();
+     buf.flip();
+     buf.position(zip.pos);
+     crc.update(buf);
+     buf.clear();
+     buf.position(pos);
+    }
+   }
+   return bufio.getBufFlush();
   }
   public void putEntry(ZipEntryM zip) {
    crc.reset();
@@ -104,7 +128,6 @@ public class ZipEntryOutput extends OutputStream implements WritableByteChannel 
  public ArrayList<ZipEntryM> list=new ArrayList();
  public long off;
  public long headOff;
- public ByteBufIo outBuf;
  public File outFile;
  public FileChannel rnio;
  public ZipEntryM entry;
@@ -124,20 +147,30 @@ public class ZipEntryOutput extends OutputStream implements WritableByteChannel 
   this(out, 16384, null);
  }
  public ZipEntryOutput(File file, int size, CharsetEncoder utf) throws FileNotFoundException {
-  FileChannel wt = new FileOutputStream(outFile = file).getChannel();
-  rnio = wt;
-  outBuf = new ByteBufIo(wt, size);
-  charsetEncoder = utf;
-  page(size);
+  this(new FileOutputStream(file).getChannel(), size, utf);
+  outFile = file;
+  rnio = (FileChannel)wt;
  }
  public ZipEntryOutput(WritableByteChannel wt) {
   this(wt, 16384, null);
  }
  public ZipEntryOutput(WritableByteChannel wt, int size, CharsetEncoder utf) {
-  outBuf = new ByteBufIo(wt, size);
+  super(wt, size);
   charsetEncoder = utf;
   page(size);
  }
+ public int pos;
+ public ByteBuffer getBuf() {
+  ByteBuffer buf= this.buf;
+  pos = buf.position();
+  return buf;
+ }
+ public ByteBuffer getBufFlush() throws IOException {
+  ByteBuffer buf=this.buf;
+  upLength(buf.position() - pos);
+  flush();
+  return buf;
+ }  
  public void cancel() {
   File out=outFile;
   if (out != null) {
@@ -145,7 +178,7 @@ public class ZipEntryOutput extends OutputStream implements WritableByteChannel 
    out = null;
   } 
   list = null;
-  outBuf.buf = null;
+  buf = null;
   try {
    close();
   } catch (Exception e) {
@@ -155,10 +188,7 @@ public class ZipEntryOutput extends OutputStream implements WritableByteChannel 
   return true;
  }
  public WritableByteChannel getNio() throws IOException {
-  ByteBufIo buf=outBuf;
-  WritableByteChannel wt = buf.wt;
-  if (wt != null)buf.flush();
-  else wt = buf;
+  flush();
   return wt;
  }
  public void upLength(long i) {
@@ -171,11 +201,11 @@ public class ZipEntryOutput extends OutputStream implements WritableByteChannel 
   throw new RuntimeException();
  }
  public void write(byte[] b, int off, int len) throws IOException {
-  outBuf.write(b, off, len);
+  super.write(b, off, len);
   upLength(len);
  }
  public int write(ByteBuffer src) throws IOException {
-  int i=outBuf.write(src);
+  int i=super.write(src);
   upLength(i);
   return i;
  }
@@ -223,7 +253,7 @@ public class ZipEntryOutput extends OutputStream implements WritableByteChannel 
   ByteBuffer buff;
   int cpos;
   if (start >= pos) {
-   buff = outBuf.buf;
+   buff = buf;
    cpos = buff.position();
    buff.position((int)(start - pos));
   } else {
@@ -239,7 +269,7 @@ public class ZipEntryOutput extends OutputStream implements WritableByteChannel 
   if (all)buff.putInt(zip.crc);
   if (start < pos) {
    if (start + wlen >= pos) {
-    ByteBuffer buf = outBuf.buf;
+    ByteBuffer buf = this.buf;
     int off=(int)(pos - start);
     int len=wlen - off;
     buf.rewind();
@@ -261,7 +291,7 @@ public class ZipEntryOutput extends OutputStream implements WritableByteChannel 
   if (!fix)zip.notFix = true;
  }
  public long size() {
-  return off - outBuf.buf.position();
+  return off - buf.position();
  }
  public void writeEntry(ZipEntryM zip) throws IOException {
   boolean utf8;
@@ -274,8 +304,7 @@ public class ZipEntryOutput extends OutputStream implements WritableByteChannel 
    utf8 = false;
    skip = true;
   }
-  ByteBufIo out=outBuf;
-  ByteBuffer buff=out.getBuf(1024);
+  ByteBuffer buff=getBuf(1024);
   int pos=buff.position();
   buff.putInt(0x04034b50);
   putBits(buff, utf8, false, zip);
@@ -309,8 +338,7 @@ public class ZipEntryOutput extends OutputStream implements WritableByteChannel 
  public void writeEntryFix(ZipEntryM zip) throws IOException {
   int size=zip.size;
   if (zip.notFix || size <= 0)return;
-  ByteBufIo out=outBuf;
-  ByteBuffer buff=out.getBuf(16);
+  ByteBuffer buff=getBuf(16);
   buff.putInt(0x08074b50);
   buff.putInt(zip.crc);
   buff.putInt(zip.csize);
@@ -351,7 +379,7 @@ public class ZipEntryOutput extends OutputStream implements WritableByteChannel 
    if (out != null) {
     outDef = null;
     out.free();
-    outBuf.close();
+    super.close();
    }
   }
  }
@@ -375,8 +403,7 @@ public class ZipEntryOutput extends OutputStream implements WritableByteChannel 
  public void writeEntryEnd(ZipEntryM zip) throws IOException {
   CharsetEncoder charsetEncoder=this.charsetEncoder;
   boolean utf8=zip.utf(charsetEncoder);
-  ByteBufIo out=outBuf;
-  ByteBuffer buff=out.getBuf(1024);
+  ByteBuffer buff=getBuf(1024);
   int pos=buff.position();
   buff.putInt(0x02014b50);
   buff.putShort((short)0);
@@ -397,7 +424,7 @@ public class ZipEntryOutput extends OutputStream implements WritableByteChannel 
   buf.position(pos);
  }
  public void writeEnd(int size)throws IOException {
-  ByteBuffer buff= outBuf.getBuf(24);
+  ByteBuffer buff= getBuf(24);
   int pos=buff.position();
   int len= pos + (pk78 ?24: 22);
   buff.putInt(0X06054B50);

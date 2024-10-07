@@ -4,7 +4,6 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.WritableByteChannel;
-import android.util.Log;
 
 public class ByteBufIo extends OutputStream implements WritableByteChannel {
  public void write(int b) {
@@ -31,7 +30,10 @@ public class ByteBufIo extends OutputStream implements WritableByteChannel {
  public void flush() throws IOException {
   ByteBuffer buf=this.buf;
   if (buf == null)return;
-  NioWriter.write(buf, wt);
+  buf.flip();
+  WritableByteChannel wt=this.wt;
+  while (buf.hasRemaining())
+   wt.write(buf);
   buf.clear();
  }
  public ByteBuffer getBuf(int page) throws IOException {

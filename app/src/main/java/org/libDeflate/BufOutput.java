@@ -26,6 +26,14 @@ public class BufOutput implements WritableByteChannel {
   n |= n >>> 16;  
   return n + 1;  
  }
+ public ByteBuffer capacity2() {
+  ByteBuffer old=this.buf;
+  ByteBuffer buf=ByteBuffer.allocateDirect(old.capacity() << 1);
+  this.buf = buf;
+  old.flip();
+  buf.put(old);
+  return buf;
+ }
  public int write(ByteBuffer src) {
   int len=src.remaining();
   ByteBuffer buf=this.buf;
@@ -33,6 +41,7 @@ public class BufOutput implements WritableByteChannel {
   if (len > limt) {
    ByteBuffer old=buf;
    this.buf = buf = ByteBuffer.allocateDirect(tableSizeFor(buf.position() + len));
+   old.flip();
    buf.put(old);
   }
   buf.put(src);

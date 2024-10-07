@@ -39,6 +39,7 @@ public class ZipUtil {
     def.write(buf, c, wlen);
     c += wlen;
    }
+   out.closeEntry();
   }
  }
 }

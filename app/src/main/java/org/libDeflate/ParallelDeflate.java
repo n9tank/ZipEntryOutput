@@ -176,7 +176,7 @@ public class ParallelDeflate implements AutoCloseable,Canceler {
    io.out = buf = new BufOutput(LibdeflateJavaUtils.getBufSize(io.bufSize, 0));
   else {
    buf = null;
-   if (iswrok)zipout.putEntry(zip, true);
+   zipout.putEntry(zip, true);
   }
   io.flush();
   if (buf != null) {
